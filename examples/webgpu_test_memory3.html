@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>gThree.js - webgpu memory test III</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="main.css">
+		<style>
+			body {
+				background-color: #fff;
+				color: #000;
+			}
+			a {
+				color: #08f;
+			}
+		</style>
+	</head>
+
+	<body>
+		<!-- Import maps polyfill -->
+		<!-- Remove this when import maps will be widely supported -->
+		<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../node_modules/three/build/three.module.js",
+					"gThree": "../build/gThree.module.js"
+				}
+			}
+		</script>
+
+		<script type="module">
+
+			import * as THREE from 'three';
+			import * as gTHREE from 'gThree';
+
+			const N = 100;
+
+			let container;
+
+			let camera, scene, renderer;
+
+			let geometry;
+
+			const meshes = [];
+
+			let fragmentShader, vertexShader;
+
+			init();
+			//animate();
+			setInterval( render, 1000 / 60 );
+
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				camera = new THREE.PerspectiveCamera( 40, window.innerWidth / window.innerHeight, 1, 10000 );
+				camera.position.z = 2000;
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0xffffff );
+
+				geometry = new THREE.SphereGeometry( 15, 64, 32 );
+
+				for ( let i = 0; i < N; i ++ ) {
+					const material = new THREE.MeshBasicMaterial({color: new THREE.Color(Math.random(), Math.random(), Math.random())});
+					const mesh = new THREE.Mesh( geometry, material );
+
+					mesh.position.x = ( 0.5 - Math.random() ) * 1000;
+					mesh.position.y = ( 0.5 - Math.random() ) * 1000;
+					mesh.position.z = ( 0.5 - Math.random() ) * 1000;
+
+					scene.add( mesh );
+
+					meshes.push( mesh );
+
+				}
+
+				renderer = new gTHREE.WebGPURenderer();
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.init();
+				container.appendChild( renderer.domElement );
+			}
+
+			//
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+
+			}
+			function render() {
+				renderer.render( scene, camera ).then(()=>{
+					for ( let i = 0; i < N; i ++ ) {
+
+						scene.remove(meshes[i]);
+						const mesh = meshes[ i ];
+						mesh.dispose();
+						mesh.material.dispose();
+					}
+					//
+					meshes.length = 0;
+					for ( let i = 0; i < N; i ++ ) {
+						const material = new THREE.MeshBasicMaterial({color: new THREE.Color(Math.random(), Math.random(), Math.random())});
+						const mesh = new THREE.Mesh( geometry, material );
+
+						mesh.position.x = ( 0.5 - Math.random() ) * 1000;
+						mesh.position.y = ( 0.5 - Math.random() ) * 1000;
+						mesh.position.z = ( 0.5 - Math.random() ) * 1000;
+
+						scene.add( mesh );
+
+						meshes.push( mesh );
+					}
+				});
+			}
+
+		</script>
+
+	</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>gThree.js webgpu - compute - texture - cube</title>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+	<link type="text/css" rel="stylesheet" href="./main.css">
+</head>
+<body>
+<script src="../node_modules/three/build/three.js"></script>
+<script src="../build/gThree.js"></script>
+<script>
+		let camera, scene, renderer, computer;
+		let mesh;
+
+		const computeShader = {
+			uniforms: {
+				resolution: {value: new THREE.Vector2(1024, 1024)}
+			},
+			//https://github.com/bbbbx/webgpu-compute/blob/main/src/comp.wgsl
+			computeShader:
+					'struct Out {\n' +
+					'    pixels: array<vec4<f32>>;\n' +
+					'};\n' +
+					'\n' +
+					'struct Resolution {\n' +
+					'    width: u32;\n' +
+					'    height: u32;\n' +
+					'};\n' +
+					'\n' +
+					'@group(0) @binding(0) var<storage, read_write> result: Out;\n' +
+					'@group(0) @binding(1) var<uniform> resolution: Resolution;\n' +
+					'\n' +
+					'@stage(compute) @workgroup_size(8, 8)\n' +
+					'fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {\n' +
+					'    let WIDTH = resolution.width;\n' +
+					'    let HEIGHT = resolution.height;\n' +
+					'\n' +
+					'    if (global_id.x >= WIDTH || global_id.y >= HEIGHT) {\n' +
+					'        return;\n' +
+					'    }\n' +
+					'\n' +
+					'    let x = f32(global_id.x) / f32(WIDTH - 1u);\n' +
+					'    let y = f32(global_id.y) / f32(HEIGHT - 1u);\n' +
+					'\n' +
+					'    // What follows is code for rendering the mandelbrot set.\n' +
+					'    let uv = vec2<f32>(x,y);\n' +
+					'    var n: f32 = 0.0f;\n' +
+					'    let c = vec2<f32>(-.445, 0.0) +  (uv - 0.5)*(2.0+ 1.7*0.2  );\n' +
+					'    var z: vec2<f32> = vec2<f32>(0.0);\n' +
+					'    let M: i32 = 128;\n' +
+					'    for (var i: i32 = 0; i < M; i = i + 1)\n' +
+					'    {\n' +
+					'        z = vec2<f32>(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;\n' +
+					'        if (dot(z, z) > 2.0) {\n' +
+					'            break;\n' +
+					'        };\n' +
+					'        n = n + 1.0;\n' +
+					'    }\n' +
+					'\n' +
+					'    // we use a simple cosine palette to determine color:\n' +
+					'    // http://iquilezles.org/www/articles/palettes/palettes.htm\n' +
+					'    let t = f32(n) / f32(M);\n' +
+					'    let d = vec3<f32>(0.3, 0.3 ,0.5);\n' +
+					'    let e = vec3<f32>(-0.2, -0.3 ,-0.5);\n' +
+					'    let f = vec3<f32>(2.1, 2.0, 3.0);\n' +
+					'    let g = vec3<f32>(0.0, 0.1, 0.0);\n' +
+					'    let color = vec4<f32>( d + e*cos( 6.28318*(f*t+g) ) ,1.0);\n' +
+					'\n' +
+					'    let index = global_id.x + WIDTH * global_id.y;\n' +
+					'    result.pixels[index] = color;\n' +
+					'}'
+		}
+		//
+		init();
+		animate();
+
+		function init() {
+
+			camera = new THREE.PerspectiveCamera( 70, window.innerWidth / window.innerHeight, 1, 1000 );
+			camera.position.z = 400;
+
+			scene = new THREE.Scene();
+			scene.background = new THREE.Color(0.0,0.0,0.0);
+
+			renderer = new gTHREE.WebGPURenderer( { antialias: true } );
+			//renderer = new THREE.WebGLRenderer( { antialias: true } );
+			renderer.setPixelRatio( window.devicePixelRatio );
+			renderer.setSize( window.innerWidth, window.innerHeight );
+			document.body.appendChild( renderer.domElement );
+
+			renderer.init().then(()=>{
+				const width = renderer.domElement.width;
+				const height = renderer.domElement.height;
+				computer = new gTHREE.WebGPUComputer({renderer: renderer});
+				computer.compute([new gTHREE.WebGPUComputeTask({
+					shader: computeShader,
+					workgroupCount: [width/8, height/8, 0],
+					resources: {
+						resolution: new THREE.Vector2(width, height),
+						result: {
+							buffer: {
+								needsCreate: true,
+								needsMap: true,
+								size: width*height*4*Float32Array.BYTES_PER_ELEMENT
+							}
+						}
+					}
+				})], (tasks)=>{
+					const readBuffer = tasks[0].resources.result.buffer.gpuReadBuffer;
+					let out, uint8ClampArray, imagedata;
+					readBuffer.mapAsync(GPUMapMode.READ, 0, readBuffer.size).then(()=>{
+						out = new Float32Array(readBuffer.getMappedRange());
+						{
+							uint8ClampArray = new Uint8ClampedArray(out.map(function (v) { return v * 255; }));
+							const texture = new THREE.DataTexture(uint8ClampArray, width, height);
+							texture.needsUpdate = true;
+							const geometry = new THREE.BoxGeometry( 200, 200, 200 );
+							const material = new THREE.MeshBasicMaterial({map: texture});
+							//const material = new THREE.MeshBasicMaterial( { color: 0x00ff00 } );
+
+							mesh = new THREE.Mesh( geometry, material );
+							scene.add( mesh );
+						}
+					});
+				});
+			});
+
+			//
+			window.addEventListener( 'resize', onWindowResize );
+		}
+
+		function onWindowResize() {
+
+			camera.aspect = window.innerWidth / window.innerHeight;
+			camera.updateProjectionMatrix();
+
+			renderer.setSize( window.innerWidth, window.innerHeight );
+
+		}
+
+		function animate() {
+
+			requestAnimationFrame( animate );
+
+			if(mesh) {
+				mesh.rotation.x += 0.005;
+				mesh.rotation.y += 0.01;
+				mesh.updateMatrixWorld();
+			}
+
+
+			renderer.render( scene, camera );
+		}
+
+	</script>
+</body>
+</html>

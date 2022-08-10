@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>gThree.js webgpu - compute - pure</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			html, body { margin: 0; }
+			#canvas-result {
+				display: block;
+				width: 100vw;
+				height: 100vh;
+			}
+		</style>
+		<link type="text/css" rel="stylesheet" href="./main.css">
+	</head>
+	<body>
+	<canvas id="canvas-result"></canvas>
+	<script src="../node_modules/three/build/three.js"></script>
+	<script src="../build/gThree.js"></script>
+	<script>
+			let camera, scene, renderer, computer;
+			let mesh;
+
+			var canvas = document.getElementById('canvas-result');
+			var dpr = 1;
+			canvas.width = window.innerWidth * dpr;
+			canvas.height = window.innerHeight * dpr;
+			var ctx = canvas.getContext('2d');
+			var width = canvas.width;
+			var height = canvas.height;
+
+			const computeShader = {
+				uniforms: {
+					resolution: {value: new THREE.Vector2(1024, 1024)}
+				},
+				//https://github.com/bbbbx/webgpu-compute/blob/main/src/comp.wgsl
+				computeShader:
+						'struct Out {\n' +
+						'    pixels: array<vec4<f32>>;\n' +
+						'};\n' +
+						'\n' +
+						'struct Resolution {\n' +
+						'    width: u32;\n' +
+						'    height: u32;\n' +
+						'};\n' +
+						'\n' +
+						'@group(0) @binding(0) var<storage, read_write> result: Out;\n' +
+						'@group(0) @binding(1) var<uniform> resolution: Resolution;\n' +
+						'\n' +
+						'@compute @workgroup_size(8, 8)\n' +
+						'fn main(@builtin(global_invocation_id) global_id : vec3<u32>) {\n' +
+						'    let WIDTH = resolution.width;\n' +
+						'    let HEIGHT = resolution.height;\n' +
+						'\n' +
+						'    if (global_id.x >= WIDTH || global_id.y >= HEIGHT) {\n' +
+						'        return;\n' +
+						'    }\n' +
+						'\n' +
+						'    let x = f32(global_id.x) / f32(WIDTH - 1u);\n' +
+						'    let y = f32(global_id.y) / f32(HEIGHT - 1u);\n' +
+						'\n' +
+						'    // What follows is code for rendering the mandelbrot set.\n' +
+						'    let uv = vec2<f32>(x,y);\n' +
+						'    var n: f32 = 0.0f;\n' +
+						'    let c = vec2<f32>(-.445, 0.0) +  (uv - 0.5)*(2.0+ 1.7*0.2  );\n' +
+						'    var z: vec2<f32> = vec2<f32>(0.0);\n' +
+						'    let M: i32 = 128;\n' +
+						'    for (var i: i32 = 0; i < M; i = i + 1)\n' +
+						'    {\n' +
+						'        z = vec2<f32>(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;\n' +
+						'        if (dot(z, z) > 2.0) {\n' +
+						'            break;\n' +
+						'        };\n' +
+						'        n = n + 1.0;\n' +
+						'    }\n' +
+						'\n' +
+						'    // we use a simple cosine palette to determine color:\n' +
+						'    // http://iquilezles.org/www/articles/palettes/palettes.htm\n' +
+						'    let t = f32(n) / f32(M);\n' +
+						'    let d = vec3<f32>(0.3, 0.3 ,0.5);\n' +
+						'    let e = vec3<f32>(-0.2, -0.3 ,-0.5);\n' +
+						'    let f = vec3<f32>(2.1, 2.0, 3.0);\n' +
+						'    let g = vec3<f32>(0.0, 0.1, 0.0);\n' +
+						'    let color = vec4<f32>( d + e*cos( 6.28318*(f*t+g) ) ,1.0);\n' +
+						'\n' +
+						'    let index = global_id.x + WIDTH * global_id.y;\n' +
+						'    result.pixels[index] = color;\n' +
+						'}'
+			}
+			//
+			computer = new gTHREE.WebGPUComputer({renderer: renderer});
+			computer.init().then((params)=>{
+				computer.compute([new gTHREE.WebGPUComputeTask({
+					shader: computeShader,
+					workgroupCount: [width/8, height/8, 0],
+					resources: {
+						resolution: new THREE.Vector2(width, height),
+						result: {
+							buffer: {
+								needsCreate: true,
+								needsMap: true,
+								size: width*height*4*Float32Array.BYTES_PER_ELEMENT
+							}
+						}
+					}
+				})], (tasks)=>{
+					const readBuffer = tasks[0].resources.result.buffer.gpuReadBuffer;
+					let out, uint8ClampArray, imagedata;
+					readBuffer.mapAsync(GPUMapMode.READ, 0, readBuffer.size).then(()=>{
+						out = new Float32Array(readBuffer.getMappedRange());
+						{
+							uint8ClampArray = new Uint8ClampedArray(out.map(function (v) { return v * 255; }));
+							imagedata = new ImageData(uint8ClampArray, width, height);
+							ctx.putImageData(imagedata, 0, 0);
+						}
+					});
+				});
+			})
+		</script>
+
+	</body>
+</html>

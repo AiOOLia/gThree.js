@@ -1,0 +1,49 @@
+{
+  "name": "gThree",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "rollup -c rollup.config.js",
+    "build-module": "ONLY_MODULE=true rollup -c rollup.config.js"
+  },
+  "keywords": [
+    "three",
+    "three.js",
+    "gThree",
+    "javascript",
+    "3d",
+    "virtual-reality",
+    "augmented-reality",
+    "webgpu",
+    "canvas",
+    "html5"
+  ],
+  "author": "aioolia",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mrdoob/three.js/issues"
+  },
+  "devDependencies": {
+    "three": "^0.142.0",
+    "@babel/core": "^7.17.9",
+    "@babel/eslint-parser": "^7.17.0",
+    "@babel/plugin-proposal-class-properties": "^7.16.7",
+    "@babel/preset-env": "^7.16.11",
+    "@rollup/plugin-babel": "^5.3.1",
+    "@rollup/plugin-node-resolve": "^13.2.0",
+    "chalk": "^5.0.1",
+    "concurrently": "^7.1.0",
+    "eslint": "^8.13.0",
+    "eslint-config-mdcs": "^5.0.0",
+    "eslint-plugin-compat": "^4.0.2",
+    "eslint-plugin-html": "^6.2.0",
+    "eslint-plugin-import": "^2.26.0",
+    "rollup": "^2.70.2",
+    "rollup-plugin-filesize": "^9.1.2",
+    "rollup-plugin-terser": "^7.0.2",
+    "rollup-plugin-visualizer": "^5.6.0",
+    "servez": "^1.14.1"
+  },
+  "peerDependencies": {
+    "three": ">=0.140.0"
+  }
+}

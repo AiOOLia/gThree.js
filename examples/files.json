@@ -1,0 +1,15 @@
+{
+
+	"webgpu": [
+		"webgpu_compute_pure",
+		"webgpu_compute_texture_cube",
+		"webgpu_buffergeometry",
+		"webgpu_geometry_cube",
+		"webgpu_geometry_teapot",
+		"webgpu_instancing_performance",
+		"webgpu_materials_texture_canvas",
+		"webgpu_test_memory",
+		"webgpu_test_memory2",
+		"webgpu_test_memory3"
+	]
+}
