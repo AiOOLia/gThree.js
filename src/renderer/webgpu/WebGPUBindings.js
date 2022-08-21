@@ -100,7 +100,7 @@ class WebGPUBindings {
 				}
 
 			} else if ( binding.isStorageBuffer ) {
-				if(binding.type === "storage-buffer") {
+				if(binding.type === "storage-buffer" && binding.buffer) {
 					binding.updateGPUBuffer(this.device);
 				} else if(binding.attribute) {
 					const attribute = binding.attribute;
